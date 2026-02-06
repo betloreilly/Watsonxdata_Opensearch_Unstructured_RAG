@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gradient-start: #0e4466;
+  --gradient-mid: #134e5e;
+  --gradient-end: #1a3a5c;
+}
+
+body {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  min-height: 100vh;
+  color: #1e293b;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(20, 184, 166, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(20, 184, 166, 0.6);
+}
+
+/* Animated gradient background */
+.bg-gradient-animated {
+  background: linear-gradient(-45deg, #0e4466, #134e5e, #1a3a5c, #0f172a);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Typing indicator */
+.typing-dot {
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Message animations */
+.message-enter {
+  animation: messageSlide 0.3s ease-out forwards;
+}
+
+@keyframes messageSlide {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Glow effects */
+.glow-teal {
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.15),
+              0 0 60px rgba(20, 184, 166, 0.1);
+}
+
+.glow-amber {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15),
+              0 0 60px rgba(245, 158, 11, 0.1);
+}
+
+/* Prose for markdown */
+.prose-custom {
+  @apply text-gray-800 leading-relaxed;
+}
+
+.prose-custom h1, .prose-custom h2, .prose-custom h3 {
+  @apply text-gray-900 font-semibold mt-4 mb-2;
+}
+
+.prose-custom p {
+  @apply mb-3 text-gray-700;
+}
+
+.prose-custom code {
+  @apply bg-gray-100 px-1.5 py-0.5 rounded text-teal-600 font-mono text-sm border border-gray-200;
+}
+
+.prose-custom pre {
+  @apply bg-gray-900 p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.prose-custom pre code {
+  @apply bg-transparent p-0 text-gray-100;
+}
+
+.prose-custom ul, .prose-custom ol {
+  @apply ml-4 mb-3 space-y-1;
+}
+
+.prose-custom li {
+  @apply list-disc text-gray-700;
+}
+
+.prose-custom strong {
+  @apply text-gray-900 font-semibold;
+}
+
+.prose-custom a {
+  @apply text-teal-600 hover:text-teal-700 hover:underline;
+}
+
+/* Table styles for markdown */
+.prose-custom table {
+  @apply w-full border-collapse my-4 text-sm;
+}
+
+.prose-custom thead {
+  @apply bg-teal-100;
+}
+
+.prose-custom th {
+  @apply text-left text-gray-900 font-semibold px-3 py-2 border border-gray-300;
+}
+
+.prose-custom td {
+  @apply px-3 py-2 border border-gray-200 text-gray-700;
+}
+
+.prose-custom tbody tr:hover {
+  @apply bg-gray-50;
+}
+
+.prose-custom tbody tr:nth-child(even) {
+  @apply bg-gray-50/50;
+}
+

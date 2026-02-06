@@ -1,0 +1,39 @@
+# ===========================================
+# RAG Chat UI - Environment Variables
+# ===========================================
+# Copy this file to .env.local in this folder and fill in your values.
+# Do not commit .env or .env.local (they are gitignored).
+#
+# OpenSearch must be a managed cluster (e.g. watsonx.data). The Unstructured.io
+# pipeline does not support local Docker OpenSearch.
+#
+# If Langflow runs in Docker with -p 7860:7860, use: LANGFLOW_URL=http://localhost:7860
+
+# --- Langflow (required for chat) ---
+LANGFLOW_URL=
+LANGFLOW_FLOW_ID=
+# No API key needed: run Langflow with LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true langflow run
+
+# --- OpenSearch (managed cluster; for Unstructured ingestion, /api/semantic, and Langflow flow) ---
+# OPENSEARCH_URL=
+# Optional: set embedding dimension for index creation (setup.sh uses this as default)
+# 1536=OpenAI text-embedding-3-small, 384/768/1024=watsonx.ai embedding models
+# EMBEDDING_DIMENSION=1536
+# OPENSEARCH_USERNAME=
+# OPENSEARCH_PASSWORD=
+# INDEX_NAME=rag_demo
+# Optional: set OPENSEARCH_SSL_VERIFY=false to skip TLS verification for HTTPS (insecure; dev only). setup.sh uses this for index creation.
+
+# --- OpenAI (optional – for Langflow flow and/or semantic mode) ---
+# Set in frontend/.env.local and in Langflow Global Variables if the flow uses OpenAI.
+# OPENAI_API_KEY=
+# OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# OPENAI_LLM_MODEL=gpt-4o-mini
+
+# --- watsonx.ai (optional – for Langflow flow) ---
+# Set in frontend/.env.local and in Langflow Global Variables if the flow uses watsonx.
+# WATSONX_API_KEY=
+# WATSONX_PROJECT_ID=
+# WATSONX_URL=
+# WATSONX_LLM_MODEL=meta-llama/llama-3-1-8b
+# WATSONX_EMBEDDING_MODEL=ibm/slate-125m-english-rtrvr-v2

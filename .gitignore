@@ -1,0 +1,33 @@
+git s.DS_Store
+.idea/
+.vscode/
+archive/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Env files / secrets (do not commit)
+.env
+.env.local
+.env.*
+!frontend/env-example.txt
+
+# Logs
+*.log
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+

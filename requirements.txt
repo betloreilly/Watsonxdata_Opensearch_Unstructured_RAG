@@ -1,0 +1,12 @@
+# Langflow - Visual RAG Builder
+langflow>=1.0.0
+
+# Langflow-base requires pydantic~=2.11.0; pin to 2.11.x to avoid 2.12 conflicts
+pydantic>=2.11,<2.12
+
+# HTTP client for API calls
+httpx>=0.26.0
+tqdm>=4.66.0
+
+# OpenSearch client
+opensearch-py>=2.4.0
