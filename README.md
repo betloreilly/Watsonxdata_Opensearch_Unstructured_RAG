@@ -129,7 +129,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-**What the script does:** Checks Python and Node.js (and can try to install them), creates `frontend/.env.local` and prompts for your OpenSearch URL and credentials, creates the OpenSearch index (with embedding dimension you choose), installs a Python venv and Langflow, then prompts you to complete Unstructured ingestion and Langflow flow import and asks for Langflow URL, Flow ID, and API key. Finally it runs `npm install` in the frontend. Use a **managed OpenSearch** cluster (e.g. watsonx.data); the Unstructured.io pipeline does not support local Docker OpenSearch.
+**What the script does:** Checks Python and Node.js (and can try to install them), creates `frontend/.env.local` and prompts for your OpenSearch URL and credentials, creates the OpenSearch index (with embedding dimension you choose), installs a Python venv and Langflow, then prompts you to complete Unstructured ingestion and Langflow flow import and asks for Langflow URL, Flow ID, and **API key** (create one in Langflow: Settings → API Keys). Finally it runs `npm install` in the frontend. Use a **managed OpenSearch** cluster (e.g. watsonx.data); the Unstructured.io pipeline does not support local Docker OpenSearch.
 
 When the script finishes, go to **[Common steps (both paths)](#3-common-steps-both-paths)** below to complete Unstructured.io flow preparation, Langflow flow import, and run the UI.
 
@@ -147,7 +147,7 @@ If you prefer to set up without the script:
    - **OPENSEARCH_URL**, **OPENSEARCH_USERNAME**, **OPENSEARCH_PASSWORD**, **INDEX_NAME** (example: `rag_demo`)
    - **OPENAI_API_KEY** — if your Langflow flow uses OpenAI
    - **WATSONX_API_KEY**, **WATSONX_PROJECT_ID**, **WATSONX_URL** (optional) — if your flow uses watsonx.ai
-   - **LANGFLOW_URL**, **LANGFLOW_FLOW_ID** — set these after you have Langflow and the flow (or use the script later). No API key is required if you run Langflow with `LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true`.
+   - **LANGFLOW_URL**, **LANGFLOW_FLOW_ID**, **LANGFLOW_API_KEY** — set these after you have Langflow and the flow (or use the script later). Create the API key in Langflow: **Settings → API Keys**.
 
 2. **Step 0: Create the OpenSearch index**  
    Before ingesting with Unstructured, pre-create the index with a `knn_vector` field whose **dimension** matches the embedding model you will use in the Unstructured UI:
@@ -214,11 +214,11 @@ Everyone must do these steps whether you used **Path A (Quick)** or **Path B (Ma
    Details: [Step 1: Ingest with Unstructured UI](#step-1-ingest-with-unstructured-ui-required).
 
 2. **Langflow flow import and configuration**  
-   Start Langflow (if you used Path A, the script already asked you to run it in another terminal). In the Langflow UI (http://localhost:7860), import the flow from **`Support Hybrid Search.json`**. In the flow, set the **OpenSearch** component to your cluster URL, index name, and credentials (same as in `.env.local`). In Langflow **Settings → Global Variables**, add **OPENAI_API_KEY** and/or **WATSONX_API_KEY**, **WATSONX_PROJECT_ID** (and optionally **WATSONX_URL**). Save the flow and note the **Flow ID**.  
+   Start Langflow (if you used Path A, the script already asked you to run it in another terminal). In the Langflow UI (http://localhost:7860), import the flow from **`Support Hybrid Search.json`**. In the flow, set the **OpenSearch** component to your cluster URL, index name, and credentials (same as in `.env.local`). In Langflow **Settings → Global Variables**, add **OPENAI_API_KEY** and/or **WATSONX_API_KEY**, **WATSONX_PROJECT_ID** (and optionally **WATSONX_URL**). Create an **API key** in **Settings → API Keys**; you will add it to `.env.local` as **LANGFLOW_API_KEY**. Save the flow and note the **Flow ID**.  
    Details: [Langflow: hybrid retrieval setup](#langflow-hybrid-retrieval-setup).
 
-3. **Langflow URL and Flow ID in .env.local**  
-   Set **LANGFLOW_URL** (e.g. `http://localhost:7860`) and **LANGFLOW_FLOW_ID** (the Flow ID from the Langflow UI) in `frontend/.env.local`. If you used **Path A**, the script prompts for these in Step 6 and writes them when you enter them; if you skipped that or used **Path B**, add them manually. No API key is required when Langflow is run with `LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true`.
+3. **Langflow URL, Flow ID, and API key in .env.local**  
+   Set **LANGFLOW_URL** (e.g. `http://localhost:7860`), **LANGFLOW_FLOW_ID** (the Flow ID from the Langflow UI), and **LANGFLOW_API_KEY** (from Langflow Settings → API Keys) in `frontend/.env.local`. If you used **Path A**, the script prompts for these in Step 6 and writes them when you enter them; if you skipped that or used **Path B**, add them manually.
 
 4. **Run the chat UI**  
    From the repo root:
@@ -403,7 +403,8 @@ GET rag_demo/_search
 
 | Issue | What to check |
 |-------|----------------|
-| Chat shows "Langflow unreachable" or connection error | Langflow must be running (e.g. `LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true langflow run`). Ensure **LANGFLOW_URL** in `frontend/.env.local` matches where Langflow is (e.g. `http://localhost:7860`). |
+| Chat shows "Langflow unreachable" or connection error | Langflow must be running. Set **LANGFLOW_API_KEY** in `frontend/.env.local` (create in Langflow: Settings → API Keys). Ensure **LANGFLOW_URL** matches where Langflow is (e.g. `http://localhost:7860`). |
+| Chat shows "Langflow returned a page instead of JSON" or "LANGFLOW_API_KEY is not set" | Set **LANGFLOW_API_KEY** in `frontend/.env.local`. Create the key in Langflow: **Settings → API Keys**. Restart the frontend after changing `.env.local`. |
 | Wrong or empty answers | Verify **LANGFLOW_FLOW_ID** in `.env.local` is the Flow ID from the Langflow UI (flow name menu or URL). Ensure the flow’s OpenSearch component uses the same index and credentials as your ingestion. |
 | OpenSearch errors in Unstructured or Langflow | Check **OPENSEARCH_URL**, **OPENSEARCH_USERNAME**, **OPENSEARCH_PASSWORD**, and **INDEX_NAME** in `.env.local`. Use a managed cluster; ensure the index exists and the embedding dimension matches your model. |
 | "OPENSEARCH_URL not configured" in UI | Edit `frontend/.env.local` (enable **Show hidden files** if you don’t see it). Restart the frontend (`npm run dev`) after changing env. |

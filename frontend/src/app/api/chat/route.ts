@@ -19,6 +19,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!LANGFLOW_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            'LANGFLOW_API_KEY is not set. Create an API key in Langflow (Settings → API Keys) and add it to frontend/.env.local.',
+        },
+        { status: 500 }
+      )
+    }
+
     // Call Langflow API
     const langflowPayload = {
       output_type: 'chat',
@@ -27,14 +37,9 @@ export async function POST(request: NextRequest) {
       session_id: session_id || uuidv4(),
     }
 
-    // Build headers - include API key if provided
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-    }
-    // Note: Langflow v1.5+ requires authentication
-    // Either set LANGFLOW_API_KEY or run Langflow with LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true
-    if (LANGFLOW_API_KEY) {
-      headers['x-api-key'] = LANGFLOW_API_KEY
+      'x-api-key': LANGFLOW_API_KEY,
     }
 
     const langflowResponse = await fetch(
@@ -51,19 +56,13 @@ export async function POST(request: NextRequest) {
     const trimmed = responseText.trim()
     const isHtml = trimmed.toLowerCase().startsWith('<!doctype') || trimmed.toLowerCase().startsWith('<html')
 
-    // Check if response is HTML (e.g. login/UI page – usually means auth required or wrong URL)
+    // Check if response is HTML (e.g. login/UI page – usually means wrong API key or URL)
     if (isHtml) {
       console.error('Langflow returned HTML (expected JSON). Status:', langflowResponse.status, trimmed.substring(0, 150))
-      const authHint =
-        !LANGFLOW_API_KEY
-          ? ' Langflow 1.5+ requires an API key: add LANGFLOW_API_KEY to frontend/.env.local (create one in Langflow: Settings → API Keys). Or run Langflow with LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true for local dev without auth.'
-          : ' Check that LANGFLOW_API_KEY is valid and LANGFLOW_FLOW_ID matches your flow in the Langflow UI.'
       return NextResponse.json(
         {
           error:
-            'Langflow returned a page instead of JSON.' +
-            authHint +
-            ' Also ensure LANGFLOW_URL is the base URL (e.g. http://localhost:7860) and the flow is built and running.',
+            'Langflow returned a page instead of JSON. Check that LANGFLOW_API_KEY in frontend/.env.local is valid (create one in Langflow: Settings → API Keys), LANGFLOW_URL is the base URL (e.g. http://localhost:7860), and the flow is built and running.',
         },
         { status: 502 }
       )

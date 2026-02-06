@@ -143,9 +143,10 @@ else
 fi
 echo ""
 echo "  Fill in your values in frontend/.env.local (required for chat to work):"
-echo "  1. OpenSearch: set OPENSEARCH_URL, OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD, INDEX_NAME (use a managed cluster; Unstructured.io pipeline does not support local Docker OpenSearch)."
-echo "  2. Optional: OPENAI_API_KEY, watsonx vars (see file for names)"
-echo "  3. LANGFLOW_URL and LANGFLOW_FLOW_ID will be set in Step 6 (do not add them yet)."
+echo "  1. OpenSearch: set OPENSEARCH_URL, OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD, and INDEX_NAME (the index name to create in Step 3b; use a managed cluster)."
+echo "  2. If your cluster uses a self-signed or expired TLS cert, add: OPENSEARCH_SSL_VERIFY=false (dev only; avoids 'certificate has expired' in the chat UI)."
+echo "  3. Optional: OPENAI_API_KEY, watsonx vars (see file for names)"
+echo "  4. LANGFLOW_URL, LANGFLOW_FLOW_ID, and LANGFLOW_API_KEY will be set in Step 6 (do not add them yet)."
 echo ""
 if [[ -n "$EDITOR" ]]; then
   read -p "  Open frontend/.env.local in your editor now? [y/N] " open_env
@@ -159,94 +160,24 @@ read -p "Press Enter when you are done editing (or to skip)..."
 echo ""
 
 # -----------------------------------------------------------------------------
-# 3b. Create OpenSearch index (managed cluster)
+# 3b. OpenSearch index (created in Step 7 using same connection as the app)
 # -----------------------------------------------------------------------------
 echo "Step 3b: OpenSearch index"
 read_env_var() {
   local key="$1"
-  grep -E "^${key}=" "$ENV_LOCAL" 2>/dev/null | cut -d= -f2- | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true
+  grep -E "^${key}=" "$ENV_LOCAL" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true
 }
-OS_URL=$(read_env_var OPENSEARCH_URL)
-OS_USER=$(read_env_var OPENSEARCH_USERNAME)
-OS_PASS=$(read_env_var OPENSEARCH_PASSWORD)
 OS_INDEX=$(read_env_var INDEX_NAME)
-OS_INDEX="${OS_INDEX:-rag_demo}"
-OS_URL="${OS_URL%/}"
-# Optional: default embedding dimension from .env.local (1536=OpenAI, 384/768/1024=watsonx)
-DEFAULT_DIM=$(read_env_var EMBEDDING_DIMENSION)
-DEFAULT_DIM="${DEFAULT_DIM:-1536}"
-
-if [[ -z "$OS_URL" ]]; then
-  echo "  OPENSEARCH_URL not set in frontend/.env.local. Skipping index creation."
-  echo "  Create the index manually (see README Step 0) before ingesting."
-else
-  read -p "  Create OpenSearch index \"$OS_INDEX\" now? (dimension will match your embedding model, default ${DEFAULT_DIM}) [Y/n] " create_idx
-  if [[ ! "$create_idx" =~ ^[nN] ]]; then
-    read -p "  Embedding dimension [${DEFAULT_DIM}] (1536=OpenAI text-embedding-3-small, 384/768/1024=watsonx): " dim
-    dim="${dim:-$DEFAULT_DIM}"
-    INDEX_JSON=$(mktemp)
-    cat << EOF > "$INDEX_JSON"
-{
-  "settings": {
-    "index": {
-      "knn": true,
-      "knn.algo_param.ef_search": 100
-    }
-  },
-  "mappings": {
-    "dynamic": true,
-    "properties": {
-      "element_id": { "type": "keyword" },
-      "record_id": { "type": "keyword" },
-      "text": { "type": "text" },
-      "type": {
-        "type": "text",
-        "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
-      },
-      "embeddings": {
-        "type": "knn_vector",
-        "dimension": $dim,
-        "method": {
-          "name": "hnsw",
-          "space_type": "cosinesimil",
-          "engine": "lucene"
-        }
-      },
-      "metadata": {
-        "type": "object",
-        "dynamic": true,
-        "enabled": true
-      }
-    }
-  }
-}
-EOF
-    CURL_OPTS=(-s -w "%{http_code}" -o /tmp/opensearch_index_response.txt -X PUT "${OS_URL}/${OS_INDEX}" -H "Content-Type: application/json" -d @"$INDEX_JSON")
-    if [[ -n "$OS_USER" ]] && [[ -n "$OS_PASS" ]]; then
-      CURL_OPTS+=(--user "${OS_USER}:${OS_PASS}")
-    fi
-    if [[ "$OS_URL" == https* ]]; then
-      SSL_VERIFY=$(read_env_var OPENSEARCH_SSL_VERIFY)
-      if [[ "$SSL_VERIFY" == "false" ]] || [[ "$SSL_VERIFY" == "0" ]]; then
-        CURL_OPTS+=(-k)
-      fi
-      # -k is insecure (skip TLS verify); only used when OPENSEARCH_SSL_VERIFY=false
-    fi
-    HTTP_CODE=$(curl "${CURL_OPTS[@]}" 2>/dev/null || echo "000")
-    rm -f "$INDEX_JSON"
-    if [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "201" ]]; then
-      echo "  Index \"$OS_INDEX\" created (dimension=$dim)."
-    elif [[ "$HTTP_CODE" == "400" ]] && grep -q "resource_already_exists_exception" /tmp/opensearch_index_response.txt 2>/dev/null; then
-      echo "  Index \"$OS_INDEX\" already exists. Skipping. (To recreate: delete it in OpenSearch Dev Tools, then run setup again.)"
-    else
-      echo "  Index creation returned HTTP $HTTP_CODE. Response: $(cat /tmp/opensearch_index_response.txt 2>/dev/null | head -c 200)"
-      echo "  Create the index manually (README Step 0) or fix OPENSEARCH_* in .env.local."
-    fi
-    rm -f /tmp/opensearch_index_response.txt
-  else
-    echo "  Skipped. Create the index manually (README Step 0) before ingesting."
-  fi
+if [[ -z "$OS_INDEX" ]]; then
+  echo "  INDEX_NAME is not set in frontend/.env.local (use the same name your app and semantic tab will use)."
+  read -p "  Enter index name (will be written to .env.local) [rag_demo]: " entered_index
+  OS_INDEX="${entered_index:-rag_demo}"
+  echo "" >> "$ENV_LOCAL"
+  echo "# OpenSearch index (used by setup and the app)" >> "$ENV_LOCAL"
+  echo "INDEX_NAME=$OS_INDEX" >> "$ENV_LOCAL"
+  echo "  Added INDEX_NAME=$OS_INDEX to frontend/.env.local"
 fi
+echo "  Index \"$OS_INDEX\" will be created in Step 7 using the same connection as the semantic tab (no curl; avoids 503 on some managed clusters)."
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -270,14 +201,12 @@ echo "  Installing Langflow..."
 pip install langflow
 echo "  Done. Dependencies and Langflow are installed."
 echo ""
-echo "  Start Langflow in a separate terminal (leave it running):"
+echo "  Start Langflow in a separate terminal (leave it running), e.g.:"
 echo ""
-echo "    cd $REPO_ROOT"
-echo "    source $VENV_DIR/bin/activate"
-echo "    LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true langflow run"
+echo "    cd $REPO_ROOT && source $VENV_DIR/bin/activate && langflow run"
 echo ""
-echo "  (No API key is required when using the command above.)"
 echo "  Then open http://localhost:7860 in your browser."
+echo "  Create an API key: Langflow UI → Settings (gear) → API Keys. You will enter it in Step 6."
 echo ""
 read -p "Press Enter when Langflow is running and you have opened http://localhost:7860..."
 echo ""
@@ -315,7 +244,7 @@ echo ""
 # -----------------------------------------------------------------------------
 # 6. Langflow URL and Flow ID → update .env.local
 # -----------------------------------------------------------------------------
-echo "Step 6: Langflow URL and Flow ID"
+echo "Step 6: Langflow URL, Flow ID, and API key"
 echo ""
 echo "  --- How to find the Flow ID in Langflow ---"
 echo "  1. Open your flow in the Langflow UI (http://localhost:7860)."
@@ -324,6 +253,8 @@ echo "  3. Look for 'API' or 'Flow ID' in the sidebar or in the flow settings."
 echo "  4. Or check the browser URL when the flow is open: it often looks like"
 echo "     .../flow/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX — that UUID is the Flow ID."
 echo ""
+echo "  --- API key: create in Langflow → Settings (gear) → API Keys ---"
+echo ""
 default_url="http://localhost:7860"
 read -p "  LANGFLOW_URL [$default_url]: " langflow_url
 langflow_url="${langflow_url:-$default_url}"
@@ -331,17 +262,24 @@ read -p "  LANGFLOW_FLOW_ID (paste the Flow ID from Langflow): " langflow_flow_i
 if [[ -z "$langflow_flow_id" ]]; then
   echo "  Warning: LANGFLOW_FLOW_ID is empty. Add it later to frontend/.env.local or the chat will not work."
 fi
+read -p "  LANGFLOW_API_KEY (paste the API key from Langflow Settings → API Keys): " langflow_api_key
+if [[ -z "$langflow_api_key" ]]; then
+  echo "  Warning: LANGFLOW_API_KEY is empty. Add it later to frontend/.env.local or the chat will not work."
+fi
 # Ensure no trailing slash
 langflow_url="${langflow_url%/}"
 
-# Update or append LANGFLOW_URL and LANGFLOW_FLOW_ID in .env.local (no API key required)
+# Update or append LANGFLOW_* in .env.local
 if [[ -f "$ENV_LOCAL" ]]; then
   tmp_env=$(mktemp)
-  grep -v '^LANGFLOW_URL=' "$ENV_LOCAL" | grep -v '^LANGFLOW_FLOW_ID=' | grep -v '^LANGFLOW_API_KEY=' > "$tmp_env" || true
+  grep -v '^LANGFLOW_URL=' "$ENV_LOCAL" | grep -v '^LANGFLOW_FLOW_ID=' | grep -v '^LANGFLOW_API_KEY=' | grep -v '^# No API key needed if you start Langflow' | grep -v '^# (If you run Langflow' > "$tmp_env" || true
+  echo "" >> "$tmp_env"
+  echo "# Langflow (required for chat) — create API key in Langflow: Settings → API Keys" >> "$tmp_env"
   echo "LANGFLOW_URL=$langflow_url" >> "$tmp_env"
   echo "LANGFLOW_FLOW_ID=$langflow_flow_id" >> "$tmp_env"
+  echo "LANGFLOW_API_KEY=$langflow_api_key" >> "$tmp_env"
   mv "$tmp_env" "$ENV_LOCAL"
-  echo "  Updated frontend/.env.local with LANGFLOW_URL and LANGFLOW_FLOW_ID"
+  echo "  Updated frontend/.env.local with LANGFLOW_URL, LANGFLOW_FLOW_ID, and LANGFLOW_API_KEY"
 fi
 echo ""
 
@@ -353,6 +291,16 @@ cd "$REPO_ROOT/frontend"
 npm install
 echo "  npm install finished"
 echo ""
+# Create OpenSearch index using the same client and .env.local as the semantic tab (avoids 503 from curl on managed clusters)
+if [[ -f "$ENV_LOCAL" ]] && grep -q "^OPENSEARCH_URL=" "$ENV_LOCAL" 2>/dev/null; then
+  echo "  Creating OpenSearch index (same connection as the semantic tab)..."
+  if NODE_ENV=development node scripts/create-opensearch-index.js; then
+    echo "  Index ready."
+  else
+    echo "  Index creation failed or skipped. You can run later: cd frontend && node scripts/create-opensearch-index.js"
+  fi
+  echo ""
+fi
 
 # -----------------------------------------------------------------------------
 # Done
@@ -361,13 +309,22 @@ echo "=============================================="
 echo "  Setup complete"
 echo "=============================================="
 echo ""
-echo "  To run the chat UI:"
-echo "    cd frontend"
-echo "    npm run dev"
-echo ""
-echo "  Then open http://localhost:3000"
-echo ""
 echo "  Reminders:"
 echo "  - Keep Langflow running (in the other terminal) while using the UI."
-echo "  - Use LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true langflow run so no API key is needed."
+echo "  - LANGFLOW_API_KEY is required; create it in Langflow: Settings → API Keys."
 echo ""
+read -p "Start the frontend now? [Y/n] " start_frontend
+if [[ ! "$start_frontend" =~ ^[nN] ]]; then
+  echo ""
+  echo "  Starting frontend at http://localhost:3000 (Ctrl+C to stop)"
+  echo ""
+  exec npm run dev
+else
+  echo ""
+  echo "  To run the chat UI later:"
+  echo "    cd frontend"
+  echo "    npm run dev"
+  echo ""
+  echo "  Then open http://localhost:3000"
+  echo ""
+fi

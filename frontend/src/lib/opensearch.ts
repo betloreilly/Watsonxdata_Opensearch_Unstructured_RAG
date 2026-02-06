@@ -4,13 +4,21 @@ import { Client } from '@opensearch-project/opensearch'
 let client: Client | null = null
 
 function normalizeOpenSearchUrl(url: string): string {
-  return url.replace(/\/+$/, '')
+  return url.trim().replace(/\/+$/, '')
 }
 
 function getRejectUnauthorized(): boolean {
-  // Default to verifying certificates (recommended for managed OpenSearch).
-  const raw = (process.env.OPENSEARCH_SSL_REJECT_UNAUTHORIZED ?? 'true').toLowerCase()
-  return raw !== 'false' && raw !== '0' && raw !== 'no'
+  // Explicitly skip TLS verification when OPENSEARCH_SSL_VERIFY=false or OPENSEARCH_SSL_REJECT_UNAUTHORIZED=false.
+  const sslVerify = (process.env.OPENSEARCH_SSL_VERIFY ?? '').toLowerCase()
+  if (sslVerify === 'false' || sslVerify === '0' || sslVerify === 'no') return false
+  const raw = (process.env.OPENSEARCH_SSL_REJECT_UNAUTHORIZED ?? '').toLowerCase()
+  if (raw === 'false' || raw === '0' || raw === 'no') return false
+  // In development, default to skipping TLS verification for HTTPS (avoids "certificate has expired" on internal/test clusters).
+  if (process.env.NODE_ENV !== 'production') {
+    const url = (process.env.OPENSEARCH_URL ?? '').trim().toLowerCase()
+    if (url.startsWith('https://')) return false
+  }
+  return true
 }
 
 export function getOpenSearchClient(): Client {

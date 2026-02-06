@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getOpenSearchClient } from '@/lib/opensearch'
 
-function normalizeOpenSearchUrl(url: string): string {
-  return url.replace(/\/+$/, '')
-}
-
-const OPENSEARCH_URL = normalizeOpenSearchUrl(process.env.OPENSEARCH_URL || '')
 const INDEX_NAME = process.env.INDEX_NAME || 'rag_demo'
-const OPENSEARCH_USERNAME = process.env.OPENSEARCH_USERNAME
-const OPENSEARCH_PASSWORD = process.env.OPENSEARCH_PASSWORD
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const OPENAI_EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'
 const OPENAI_LLM_MODEL = process.env.OPENAI_LLM_MODEL || 'gpt-4o-mini'
 const OPENSEARCH_VECTOR_FIELD = process.env.OPENSEARCH_VECTOR_FIELD || 'embeddings'
 const OPENSEARCH_K = Number(process.env.OPENSEARCH_K || '2')
+const OPENSEARCH_URL = (process.env.OPENSEARCH_URL || '').trim().replace(/\/+$/, '') || ''
 
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
@@ -64,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const queryVector = embeddingResponse.data[0].embedding
 
-    // Step 2: Semantic-only search (k-NN vector search, no BM25)
+    // Step 2: Semantic-only search (k-NN vector search) via OpenSearch client (respects OPENSEARCH_SSL_VERIFY)
     const searchQuery = {
       size: OPENSEARCH_K,
       _source: ['text', 'file_path'],
@@ -78,42 +73,25 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (OPENSEARCH_USERNAME) {
-      const token = Buffer.from(`${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD || ''}`).toString('base64')
-      headers.Authorization = `Basic ${token}`
-    }
-
-    let searchResponse: Response
+    let hits: OpenSearchHit[]
     try {
-      searchResponse = await fetch(`${OPENSEARCH_URL}/${INDEX_NAME}/_search`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(searchQuery),
+      const os = getOpenSearchClient()
+      const searchResponse = await os.search({
+        index: INDEX_NAME,
+        body: searchQuery,
       })
+      hits = (searchResponse.body?.hits?.hits ?? []) as OpenSearchHit[]
     } catch (err) {
       console.error('OpenSearch fetch failed:', err)
       return NextResponse.json(
         {
           error:
             `Failed to reach OpenSearch at ${OPENSEARCH_URL} (index: ${INDEX_NAME}). ` +
-            'Check OPENSEARCH_URL and whether the cluster is reachable from this machine.',
+            'Check OPENSEARCH_URL and whether the cluster is reachable. If you see "certificate has expired", set OPENSEARCH_SSL_VERIFY=false in frontend/.env.local (dev only).',
         },
         { status: 502 }
       )
     }
-
-    if (!searchResponse.ok) {
-      const errorText = await searchResponse.text()
-      console.error('OpenSearch error:', errorText)
-      return NextResponse.json(
-        { error: 'Failed to search OpenSearch' },
-        { status: 502 }
-      )
-    }
-
-    const searchData = await searchResponse.json()
-    const hits: OpenSearchHit[] = searchData.hits?.hits || []
 
     if (hits.length === 0) {
       return NextResponse.json({
