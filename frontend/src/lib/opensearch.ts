@@ -48,3 +48,34 @@ export function getOpenSearchClient(): Client {
   }
   return client
 }
+
+export type RAGAnalyticsEntry = {
+  timestamp: string
+  session_id?: string
+  question: string
+  answer: string
+  search_type?: string
+  latency_ms?: number
+  [key: string]: unknown
+}
+
+/**
+ * Log a RAG interaction to an OpenSearch analytics index.
+ * Stub implementation – customize index name and document shape as needed.
+ */
+export async function logRAGInteraction(entry: RAGAnalyticsEntry): Promise<void> {
+  try {
+    const client = getOpenSearchClient()
+    const index = process.env.OPENSEARCH_ANALYTICS_INDEX || 'rag_analytics'
+    await client.index({
+      index,
+      body: {
+        ...entry,
+        timestamp: entry.timestamp ?? new Date().toISOString(),
+      },
+    })
+  } catch (err) {
+    // Non-fatal: log failure without breaking the main request
+    console.error('Failed to log RAG interaction:', err)
+  }
+}
